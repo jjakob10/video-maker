@@ -1,2 +1,2 @@
 # video-maker
-I'm just exploring parts of a tutorial that conatains userful tools for other project. Credits: Filipe Deschamps
+I'm just exploring parts of a tutorial that contains userful tools for other project. Credits: Filipe Deschamps
