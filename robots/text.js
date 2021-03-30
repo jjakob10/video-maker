@@ -1,11 +1,24 @@
 const algorithimiaApiKey = require("../credentials/algorithmia.json").apiKey;
+const watsonApiKey = require("../credentials/watson.json").apikey;
 const algorithimia = require("algorithmia");
 const sentenceBoundaryDetection = require("sbd");
+const NaturalLanguageUnderstandingV1 = require("ibm-watson/natural-language-understanding/v1");
+const { IamAuthenticator } = require("ibm-watson/auth");
+
+const nlu = new NaturalLanguageUnderstandingV1({
+  authenticator: new IamAuthenticator({ apikey: watsonApiKey }),
+  version: "2018-04-05",
+  serviceUrl:
+    "https://api.us-south.natural-language-understanding.watson.cloud.ibm.com",
+});
 
 async function robot(content) {
   await fetchContentFromWikipedia(content);
   sanitizeContent(content);
-  breakCOntentIntoSentences(content);
+  breakContentIntoSentences(content);
+  limitMaximumSentences(content);
+  await fetchKeywordsOfAllSentences(content);
+  console.log(content.sentences);
 
   async function fetchContentFromWikipedia(content) {
     const algorithimiaAuthenticated = algorithimia(algorithimiaApiKey);
@@ -47,7 +60,7 @@ async function robot(content) {
         .replace(/  /g, "");
     }
   }
-  function breakCOntentIntoSentences(content) {
+  function breakContentIntoSentences(content) {
     content.sentences = [];
 
     const sentences = sentenceBoundaryDetection.sentences(
@@ -59,6 +72,39 @@ async function robot(content) {
         keywords: [],
         images: [],
       });
+    });
+  }
+
+  function limitMaximumSentences(content) {
+    content.sentences = content.sentences.slice(0, content.maximumSentences);
+  }
+
+  async function fetchKeywordsOfAllSentences(content) {
+    for (const sentence of content.sentences) {
+      sentence.keywords = await fetchWatsonAndReturnKeywords(sentence.text);
+    }
+  }
+
+  async function fetchWatsonAndReturnKeywords(sentence) {
+    return new Promise((resolve, reject) => {
+      nlu
+        .analyze({
+          text: sentence, // Buffer or String
+          features: {
+            //concepts: {},
+            keywords: {},
+          },
+        })
+        .then((response) => {
+          const keywords = response.result.keywords.map(
+            (keywords) => keywords.text
+          );
+          //console.log(JSON.stringify(response.result, null, 2));
+          resolve(keywords);
+        })
+        .catch((err) => {
+          reject(err);
+        });
     });
   }
 }
